@@ -17,6 +17,14 @@ terraform {
       source  = "hashicorp/null"
       version = "~> 3.0"
     }
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.0"
+    }
+    kubectl = {
+      source  = "alekc/kubectl"
+      version = "~> 2.0"
+    }
     rhcs = {
       source  = "terraform-redhat/rhcs"
       version = "~> 1.0"
@@ -34,4 +42,14 @@ provider "aws" {
 
 provider "rhcs" {
   token = var.rhcs_token
+}
+
+// Workaround due lack of native OpenShift provider
+data "external" "openshift_context" {
+  program = ["bash", "helpers/openshift_create_context.sh", var.rhcs_token, module.hcp.cluster_id, var.openshift_demo_user_login, random_password.password.result]
+}
+
+provider "kubectl" {
+  host  = data.external.openshift_context.result.server
+  token = data.external.openshift_context.result.token
 }

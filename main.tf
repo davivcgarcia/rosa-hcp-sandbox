@@ -79,9 +79,10 @@ resource "random_password" "password" {
 resource "null_resource" "cluster_permission_workaround" {
   depends_on = [module.htpasswd_idp]
   provisioner "local-exec" {
-    command = <<-EOT
+    interpreter = ["/bin/bash"]
+    command     = <<-EOT
     rosa login --token=${var.rhcs_token}
-    rosa grant user dedicated-admin --user=${var.openshift_demo_user_login} --cluster=${var.environment_name}
+    rosa grant user cluster-admin --user=${var.openshift_demo_user_login} --cluster=${var.environment_name}
     EOT
   }
 }
@@ -109,4 +110,74 @@ module "mp-extra" {
     min_replicas = 1
     max_replicas = 3
   }
+}
+
+############################
+# Kubernetes Sample Resources
+############################
+
+resource "kubectl_manifest" "helloworld-ns" {
+  yaml_body = <<-EOT
+  apiVersion: project.openshift.io/v1
+  kind: Project
+  metadata:
+    name: helloworld
+    annotations:
+      openshift.io/description: "Sample project for Hello World"
+      openshift.io/display-name: "Hello World, from OpenShift!" 
+  EOT
+}
+
+// Problem because the image is not a scratch by a S2I builder
+resource "kubectl_manifest" "helloworld-deploy" {
+  depends_on       = [kubectl_manifest.helloworld-ns]
+  wait_for_rollout = false
+  yaml_body        = <<-EOT
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: helloworld
+    name: helloworld
+    namespace: helloworld
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: helloworld
+    template:
+      metadata:
+        labels:
+          app: helloworld
+      spec:
+        containers:
+        - image: registry.redhat.io/rhel9/nginx-124:1-25.1726663417
+          name: nginx
+          ports:
+          - containerPort: 8080
+          resources:
+            requests:
+              cpu: 256m
+              memory: 512Mi
+  EOT
+}
+
+resource "kubectl_manifest" "helloworld-svc" {
+  depends_on = [kubectl_manifest.helloworld-ns]
+  yaml_body  = <<-EOT
+  apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: helloworld
+    name: helloworld
+    namespace: helloworld
+  spec:
+    selector:
+      app: helloworld
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 8080
+  EOT
 }

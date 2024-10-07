@@ -42,7 +42,7 @@ terraform apply -var "rhcs_token=<TOKEN HERE>"
 5. After deployment, login to ROSA cluster with demo user (dedicated-admin) created using the following command:
 
 ```bash
-ROSA_API_URL=$(rosa describe cluster --cluster=$(terraform output -raw rosa_cluster_id) -o json | jq -r .api.url)
+ROSA_API_URL=$(terraform output -raw openshift_api_url)
 ROSA_USERNAME=$(terraform output -raw openshift_demo_user_login)
 ROSA_USER_PASSWORD=$(terraform output -raw openshift_demo_user_password)
 
