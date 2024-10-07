@@ -1,4 +1,12 @@
 ############################
+# Local Variables
+############################
+
+locals {
+  availability_zones_count = 3
+}
+
+############################
 # Input Variables
 ############################
 
@@ -45,7 +53,12 @@ variable "openshift_host_prefix" {
 }
 
 variable "openshift_default_instance_type" {
-  type = string
+  type    = string
+  default = "m6a.xlarge"
+}
+
+variable "openshift_extra_instance_type" {
+  type    = string
   default = "m6g.xlarge"
 }
 

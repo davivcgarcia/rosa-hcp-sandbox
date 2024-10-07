@@ -7,7 +7,7 @@ module "vpc" {
 
   name_prefix              = var.environment_name
   vpc_cidr                 = var.openshift_machine_cidr
-  availability_zones_count = 3
+  availability_zones_count = local.availability_zones_count
 }
 
 ############################
@@ -21,19 +21,19 @@ module "hcp" {
   openshift_version      = var.openshift_release
   aws_billing_account_id = var.aws_billing_account
 
-  // OpenShift Networking Prefix
+  // OpenShift Networking
   machine_cidr = module.vpc.cidr_block
   service_cidr = var.openshift_service_cidr
   pod_cidr     = var.openshift_pod_cidr
   host_prefix  = var.openshift_host_prefix
 
-  // OpenShift Machine Pools
+  // OpenShift Machine Pool (Default Worker)
   aws_availability_zones = module.vpc.availability_zones
   aws_subnet_ids = concat(
     module.vpc.private_subnets,
     module.vpc.public_subnets
   )
-  replicas             = 2 * length(module.vpc.availability_zones)
+  replicas             = 1 * length(module.vpc.availability_zones)
   compute_machine_type = var.openshift_default_instance_type
 
   // STS configuration
@@ -73,4 +73,40 @@ resource "random_password" "password" {
   min_numeric = 1
   min_special = 1
   min_upper   = 1
+}
+
+// Workaround due https://github.com/terraform-redhat/terraform-provider-rhcs/issues/809
+resource "null_resource" "cluster_permission_workaround" {
+  depends_on = [module.htpasswd_idp]
+  provisioner "local-exec" {
+    command = <<-EOT
+    rosa login --token=${var.rhcs_token}
+    rosa grant user dedicated-admin --user=${var.openshift_demo_user_login} --cluster=${var.environment_name}
+    EOT
+  }
+}
+
+############################
+# ROSA Machine Pool (Extra)
+############################
+module "mp-extra" {
+  source  = "terraform-redhat/rosa-hcp/rhcs//modules/machine-pool"
+  version = "~> 1.0"
+
+  cluster_id        = module.hcp.cluster_id
+  openshift_version = var.openshift_release
+  count             = length(module.vpc.availability_zones)
+  name              = "extra-${count.index}"
+
+  aws_node_pool = {
+    instance_type = var.openshift_extra_instance_type
+    tags          = {}
+  }
+
+  subnet_id = module.vpc.private_subnets[count.index]
+  autoscaling = {
+    enabled      = true
+    min_replicas = 1
+    max_replicas = 3
+  }
 }

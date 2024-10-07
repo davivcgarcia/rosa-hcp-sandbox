@@ -13,6 +13,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
     rhcs = {
       source  = "terraform-redhat/rhcs"
       version = "~> 1.0"

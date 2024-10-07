@@ -39,7 +39,7 @@ cat rosa-hcp-sandbox/variables.tf
 terraform apply -var "rhcs_token=<TOKEN HERE>"
 ```
 
-5. After deployment, login to ROSA cluster with demo user (unprivileged) created using the following command:
+5. After deployment, login to ROSA cluster with demo user (dedicated-admin) created using the following command:
 
 ```bash
 ROSA_API_URL=$(rosa describe cluster --cluster=$(terraform output -raw rosa_cluster_id) -o json | jq -r .api.url)
@@ -49,11 +49,7 @@ ROSA_USER_PASSWORD=$(terraform output -raw openshift_demo_user_password)
 oc login $ROSA_API_URL -u $ROSA_USERNAME -p $ROSA_USER_PASSWORD
 ```
 
-6. If you need privileged permission mapped to your demo user, use Red Hat OpenShift Cluster Management to add it:
-
-[https://console.redhat.com/openshift/cluster-list](https://console.redhat.com/openshift/cluster-list)
-
-7. To destroy the environment, use the following:
+6. To destroy the environment, use the following:
 
 ```bash
 terraform destroy
