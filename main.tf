@@ -113,71 +113,268 @@ module "mp-extra" {
 }
 
 ############################
-# Kubernetes Sample Resources
+# OpenShift Sample App (OSToy)
+# https://www.rosaworkshop.io/ostoy/3-lab_overview/#ostoy-application-diagram
 ############################
 
-resource "kubectl_manifest" "helloworld-ns" {
+resource "kubectl_manifest" "ostoy-ns" {
   yaml_body = <<-EOT
   apiVersion: project.openshift.io/v1
   kind: Project
   metadata:
-    name: helloworld
+    name: ostoy
     annotations:
       openshift.io/description: "Sample project for Hello World"
       openshift.io/display-name: "Hello World, from OpenShift!" 
   EOT
 }
 
-// Problem because the image is not a scratch by a S2I builder
-resource "kubectl_manifest" "helloworld-deploy" {
-  depends_on       = [kubectl_manifest.helloworld-ns]
+resource "kubectl_manifest" "ostoy-backend-deploy" {
+  depends_on = [kubectl_manifest.ostoy-ns]
   wait_for_rollout = false
-  yaml_body        = <<-EOT
+  yaml_body  = <<-EOT
   apiVersion: apps/v1
   kind: Deployment
   metadata:
+    name: ostoy-microservice
+    namespace: ostoy
     labels:
-      app: helloworld
-    name: helloworld
-    namespace: helloworld
+      app: ostoy
   spec:
-    replicas: 1
     selector:
       matchLabels:
-        app: helloworld
+        app: ostoy-microservice
+    replicas: 1
     template:
       metadata:
         labels:
-          app: helloworld
+          app: ostoy-microservice
       spec:
+        nodeSelector:
+          kubernetes.io/arch: amd64
         containers:
-        - image: registry.redhat.io/rhel9/nginx-124:1-25.1726663417
-          name: nginx
+        - name: ostoy-microservice
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+              - ALL
+          image: quay.io/ostoylab/ostoy-microservice:1.5.0
+          imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 8080
+            protocol: TCP
           resources:
             requests:
-              cpu: 256m
-              memory: 512Mi
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "100m"
   EOT
 }
 
-resource "kubectl_manifest" "helloworld-svc" {
-  depends_on = [kubectl_manifest.helloworld-ns]
+resource "kubectl_manifest" "ostoy-backend-svc" {
+  depends_on = [kubectl_manifest.ostoy-ns]
   yaml_body  = <<-EOT
   apiVersion: v1
   kind: Service
   metadata:
+    name: ostoy-microservice-svc
+    namespace: ostoy
     labels:
-      app: helloworld
-    name: helloworld
-    namespace: helloworld
+      app: ostoy-microservice
+  spec:
+    type: ClusterIP
+    ports:
+      - port: 8080
+        targetPort: 8080
+        protocol: TCP
+    selector:
+      app: ostoy-microservice
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-pvc" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  yaml_body  = <<-EOT
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ostoy-pvc
+    namespace: ostoy
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-deploy" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  wait_for_rollout = false
+  yaml_body  = <<-EOT
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: ostoy-frontend
+    namespace: ostoy
+    labels:
+      app: ostoy
   spec:
     selector:
-      app: helloworld
+      matchLabels:
+        app: ostoy-frontend
+    strategy:
+      type: Recreate
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: ostoy-frontend
+      spec:
+        nodeSelector:
+          kubernetes.io/arch: amd64
+        containers:
+        - name: ostoy-frontend
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+              - ALL
+          image: quay.io/ostoylab/ostoy-frontend:1.6.0
+          imagePullPolicy: IfNotPresent
+          ports:
+          - name: ostoy-port
+            containerPort: 8080
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "200m"
+          volumeMounts:
+          - name: configvol
+            mountPath: /var/config
+          - name: secretvol
+            mountPath: /var/secret
+          - name: datavol
+            mountPath: /var/demo_files
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          env:
+          - name: ENV_TOY_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: ostoy-secret-env
+                key: ENV_TOY_SECRET
+          - name: MICROSERVICE_NAME
+            value: OSTOY_MICROSERVICE_SVC
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        volumes:
+          - name: configvol
+            configMap:
+              name: ostoy-configmap-files
+          - name: secretvol
+            secret:
+              defaultMode: 420
+              secretName: ostoy-secret
+          - name: datavol
+            persistentVolumeClaim:
+              claimName: ostoy-pvc
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-svc" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  yaml_body  = <<-EOT
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: ostoy-frontend-svc
+    namespace: ostoy
+    labels:
+      app: ostoy-frontend
+  spec:
+    type: ClusterIP
     ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 8080
+      - port: 8080
+        targetPort: ostoy-port
+        protocol: TCP
+        name: ostoy
+    selector:
+      app: ostoy-frontend
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-route" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  yaml_body  = <<-EOT
+  apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: ostoy-route
+    namespace: ostoy
+  spec:
+    to:
+      kind: Service
+      name: ostoy-frontend-svc
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-secret-env" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  yaml_body  = <<-EOT
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ostoy-secret-env
+    namespace: ostoy
+  type: Opaque
+  data:
+    ENV_TOY_SECRET: VGhpcyBpcyBhIHRlc3Q=
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-cm" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  yaml_body  = <<-EOT
+  kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    name: ostoy-configmap-files
+    namespace: ostoy
+  data:
+    config.json:  '{ "default": "123" }'
+  EOT
+}
+
+resource "kubectl_manifest" "ostoy-frontend-secret-file" {
+  depends_on = [kubectl_manifest.ostoy-ns]
+  yaml_body  = <<-EOT
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ostoy-secret
+    namespace: ostoy
+  data:
+    secret.txt: VVNFUk5BTUU9bXlfdXNlcgpQQVNTV09SRD1AT3RCbCVYQXAhIzYzMlk1RndDQE1UUWsKU01UUD1sb2NhbGhvc3QKU01UUF9QT1JUPTI1
+  type: Opaque
   EOT
 }

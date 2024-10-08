@@ -9,7 +9,7 @@ You will need the following CLI tools:
 - [terraform](https://developer.hashicorp.com/terraform/install)
 - [jq](https://jqlang.github.io/jq/)
 - [aws cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [rosa/openshift cli](https://docs.openshift.com/rosa/rosa_install_access_delete_clusters/rosa_getting_started_iam/rosa-installing-rosa.html)
+- [rosa/oc cli](https://docs.openshift.com/rosa/rosa_install_access_delete_clusters/rosa_getting_started_iam/rosa-installing-rosa.html)
 
 Also, the `aws` CLI must be already configured, with the proper credentials associated with the AWS Account to be used with ROSA.
 
@@ -23,13 +23,13 @@ cd rosa-hcp-sandbox/
 terraform init
 ```
 
-2. Validate if the input variables are good for your environment:
+2. Validate if the input variables are good for your lab environment:
 
 ```bash
 cat rosa-hcp-sandbox/variables.tf
 ```
 
-3. Access Red Hat Hybrid Console and grab your authentication token:
+3. Access Red Hat Hybrid Console and copy your authentication token:
 
 [https://console.redhat.com/openshift/token/rosa](https://console.redhat.com/openshift/token/rosa)
 
