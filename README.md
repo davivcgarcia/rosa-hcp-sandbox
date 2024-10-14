@@ -39,7 +39,7 @@ cat rosa-hcp-sandbox/variables.tf
 terraform apply -var "rhcs_token=<TOKEN HERE>"
 ```
 
-5. After deployment, login to ROSA cluster with demo user (dedicated-admin) created using the following command:
+5. After deployment, login to ROSA cluster with demo user (`cluster-admin` role) created using the following command:
 
 ```bash
 ROSA_API_URL=$(terraform output -raw openshift_api_url)
