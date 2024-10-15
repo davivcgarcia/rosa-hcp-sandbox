@@ -4,14 +4,18 @@ This repository contains **not production-ready** automation to provision Red Ha
 
 ## Prerequisites
 
-You will need the following CLI tools:
+You must follow the following documentation to activate ROSA service in your AWS Account:
+
+- [AWS > Documentation > Red Hat OpenShift Service on AWS > User Guide - Set up to use ROSA](https://docs.aws.amazon.com/rosa/latest/userguide/set-up.html)
+
+After that, install the following CLI tools in the machine where Terraform will be executed:
 
 - [terraform](https://developer.hashicorp.com/terraform/install)
 - [jq](https://jqlang.github.io/jq/)
 - [aws cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - [rosa/oc cli](https://docs.openshift.com/rosa/rosa_install_access_delete_clusters/rosa_getting_started_iam/rosa-installing-rosa.html)
 
-Also, the `aws` CLI must be already configured, with the proper credentials associated with the AWS Account to be used with ROSA.
+Lastly, make sure the `aws` CLI is already configured with the proper credentials and permissions for AWS Account to be used with ROSA.
 
 ## Usage
 
